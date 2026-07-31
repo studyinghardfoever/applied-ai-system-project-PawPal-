@@ -1,0 +1,79 @@
+flowchart TD
+    subgraph UI["Streamlit UI (app.py)"]
+        A[User types natural language request in AI Assistant chat box]
+        M[User can also use manual forms - Add Pet / Add Task - fallback path]
+    end
+
+    subgraph AGENT["Agentic Layer (pawpal_agent.py)"]
+        B["chat function sends message to Gemini"]
+        C{Gemini decides: call a tool or answer directly?}
+        D[Execute matching tool method on PawPalAgent]
+        E[Send tool result back to Gemini]
+        F{More tool calls needed? max 5 steps guardrail}
+        G[Extract final natural-language summary text]
+    end
+
+    subgraph TOOLS["Tool Layer (wraps pawpal_system.py)"]
+        T1[add_pet_tool]
+        T2[add_task_tool]
+        T3[get_schedule_tool]
+        T4[detect_conflicts_tool]
+        T5[filter_incomplete_tasks_tool]
+        T6[filter_by_pet_tool]
+        T7[complete_task_tool]
+    end
+
+    subgraph CORE["Core Domain Logic (pawpal_system.py)"]
+        H[Owner Pet Task Scheduler - original Module 2 scheduling classes]
+    end
+
+    subgraph RELIABILITY["Reliability and Guardrails"]
+        R1["send_with_retry - auto-retries on 429 rate-limit errors"]
+        R2["try except around every tool call - never crashes on bad input"]
+        R3["agent.log - records every request tool call and error"]
+    end
+
+    subgraph HUMAN["Human-in-the-loop"]
+        HU1[Developer reviews agent.log to verify tool-call correctness]
+        HU2[Manual form results are compared against AI-driven results as a sanity check]
+        HU3["test_agent.py - scripted test cases reviewed by a human before submission"]
+    end
+
+    A --> B
+    B --> R1
+    R1 --> C
+    C -->|tool call requested| D
+    C -->|no tool needed| G
+    D --> T1
+    D --> T2
+    D --> T3
+    D --> T4
+    D --> T5
+    D --> T6
+    D --> T7
+    T1 --> H
+    T2 --> H
+    T3 --> H
+    T4 --> H
+    T5 --> H
+    T6 --> H
+    T7 --> H
+    T1 --> R2
+    T2 --> R2
+    T3 --> R2
+    T4 --> R2
+    T5 --> R2
+    T6 --> R2
+    T7 --> R2
+    R2 --> E
+    E --> R1
+    R1 --> F
+    F -->|yes| C
+    F -->|no| G
+    G --> UI_OUT[Reply shown in chat plus Schedule and Conflicts sections auto-refresh]
+    M --> H
+    D -.logged by.-> R3
+    R2 -.logged by.-> R3
+    R3 -.reviewed by.-> HU1
+    UI_OUT -.compared against.-> HU2
+    B -.exercised by.-> HU3
